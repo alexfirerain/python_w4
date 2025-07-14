@@ -1,0 +1,25 @@
+h2 {
+    color: blue;
+}
+
+p.red {
+   color: RGBA(255,0,0,1);
+}
+
+.green {
+color: green;
+}
+
+#yellow {
+color: yellow;
+}
+
+ul>li {
+color: yellow;
+}
+
+#alive {
+    font-family: 'Arial';
+    font-size: 24pt;
+    text-align: center
+}
