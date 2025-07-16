@@ -33,7 +33,6 @@ link = f'https://static-maps.yandex.ru/1.x/?ll={ll}&spn=0.0025,0.0025&l=map&pt={
 # spn = разница между долготами
 # l = режим отображения: map/sat
 # для показа битовых массивов прямо из ОЗУ
-# GVp-emM-VAW-MBT-G64-e0-data
 
 
 image = requests.get(link).content
