@@ -6,7 +6,7 @@
 # модель это хранимые данные, представление это что отображаем,
 # а контроллер это тот, кто принимает запросы и отвечает
 #
-from flask import Flask, url_for
+from flask import Flask, url_for, request
 import sqlite3
 
 # внутри Фласка есть сервер, на локальном хосте он кудахчет
@@ -73,10 +73,10 @@ def sample_page2():
     with open('temp2.html', 'r', encoding='utf-8') as h:
         return h.read()
 
-@app.route('/form')
-def form():
-    with open('static/html/form.html', 'r', encoding='utf-8') as h:
-        return h.read()
+# @app.route('/form')
+# def form():
+#     with open('static/html/form.html', 'r', encoding='utf-8') as h:
+#         return h.read()
 
 
 # x = 5
@@ -129,8 +129,34 @@ def return_person(trip_id=None):
         print(trip_id)
     return get_person(trip_id)[0], '200 OK'
 
+
+# GET запрашивает данные, не меняя состояние сервера (read)
+# POST отправляет данные на сервер (submit)
+# PUT обновляет, (заменяет всё принудительно), данные на сервере (update)
+# DELETE удаляет данные с сервера (delete)
+# PATCH частично обновляет данные на сервере (update)
+
+@app.route('/form', methods=['GET', 'POST'])
+def form_test():
+    if request.method == 'GET':
+        with open('static/html/form.html', 'r', encoding='utf-8') as h:
+            return h.read()
+    elif request.method == 'POST':
+        result = request.form
+        print(result['gender'])
+        print(result['email'])
+        print(result['accept'])
+        print(result)
+
+        return "Форма успешно отправлена!<br>"
+
+#     "контекст запроса" так называется тело ответа
+# ДЗ <input type="reset"> и сабмит, а ещё посмотреть, что пишет какой браузер на кнопке по умолчанию
+# ДЗ как закинуть файл на сервер (через форму)
+
+
 # для запуска сервера импортируем app, вызываем run,
 # эта строка должна быть в конце!
 if __name__ == '__main__':
-    app.run(host='localhost', port=5000, debug=True)  # условно принят (в Докере 3000, ещё 8000 иногда)
+    app.run(host='localhost', port=5000, debug=False)  # условно принят (в Докере 3000, ещё 8000 иногда)
 # приказы идут сверху вниз, подписи идут снизу вверх
