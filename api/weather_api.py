@@ -1,9 +1,10 @@
-KEY = '9b00cf4c643ecc72e44b4c35d8c977a4'
 # наша погода с сервера
-import requests
+import requests, io
+from PIL import Image
 
 URL = 'http://api.openweathermap.org/data/2.5/weather'
 CITY = 'Санкт-Петербург'
+KEY = '9b00cf4c643ecc72e44b4c35d8c977a4'
 
 params = {
     'q': CITY,
@@ -14,13 +15,13 @@ params = {
 
 response = requests.get(URL, params=params)
 print(response)
-weather_res = response.json()
-weather = weather_res['weather'][0]['description']
-temperature = weather_res['main']['temp']
-humidity = weather_res['main']['humidity']
-wind = weather_res['wind']['speed']
+wr = response.json()
+weather = wr['weather'][0]['description']
+temperature = wr['main']['temp']
+humidity = wr['main']['humidity']
+wind = wr['wind']['speed']
 
-data = weather_res['coord']
+data = wr['coord']
 print(data)
 ll = f'{data['lon']},{data['lat']}'
 
@@ -32,8 +33,8 @@ link = f'https://static-maps.yandex.ru/1.x/?ll={ll}&spn=0.0025,0.0025&l=map&pt={
 # spn = разница между долготами
 # l = режим отображения: map/sat
 # для показа битовых массивов прямо из ОЗУ
-import io
-from PIL import Image
+# GVp-emM-VAW-MBT-G64-e0-data
+
 
 image = requests.get(link).content
 if image:
