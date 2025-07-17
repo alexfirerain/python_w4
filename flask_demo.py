@@ -1,4 +1,5 @@
 # Введение въ Flask
+import os
 
 # MVC - Model View Controller - Модель Представление Контроллер
 # Фласк и есть такой фреймворк, минимально реализующий MVC
@@ -13,7 +14,7 @@ import sqlite3
 # до тех пор, пока не остановишь
 
 app = Flask(__name__)
-
+app.config['UPLOAD_FOLDER'] = 'uploads'
 
 # для коммуникации с браузером юзаем декоратор @app.route
 @app.route('/')
@@ -93,8 +94,8 @@ def sample_page2():
 # <path:p> - может содержать слеши в пути!
 # <uuid:id> - так передаём UUID, идентификатор 16 байт шестнадцатеричных, стандартный быстрый случайный
 @app.route('/greeting/<user>/<int:id>')  # <user> - так правильно вносить все переменные
-def greeting(user, id):
-    return f'Привет, {user} с токеном {id}!<br>'
+def greeting(user, user_id):
+    return f'Привет, {user} с токеном {user_id}!<br>'
 
 
 
@@ -148,7 +149,12 @@ def form_test():
         print(result['accept'])
         print(result)
 
-        return "Форма успешно отправлена!<br>"
+        file = request.files['file']
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
+
+        return "Форма успешно отправлена!<br>", '200 OK'
+    return 'Такая тема не воспринимается сервером', '405 METHOD NOT ALLOWED'
+
 
 #     "контекст запроса" так называется тело ответа
 # ДЗ <input type="reset"> и сабмит, а ещё посмотреть, что пишет какой браузер на кнопке по умолчанию
