@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Список дел</title>
+</head>
+<body>
+<ol>
+    {% for item in deals %}
+        <li>{{item}}</li>
+    {% endfor %}
+</ol>
+</body>
+</html>

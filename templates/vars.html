@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{  title  }}</title>
+<!-- пробелы внутри поля перейдут в документ   -->
+</head>
+<body>
+
+{% set user_list = ['Том', 'Тед', 'Такер'] %}
+<h1>В очереди к золотому крыльцу сидели:</h1>
+<ul>
+    {% for user in user_list %}
+    <li>{{loop.index}} - {{user}}</li>
+
+    {% if loop.first %}
+    первый в очереди
+    {% elif loop.last %}
+    последний в очереди
+    {% endif %}
+    {% endfor %}
+</ul>
+
+<!--index, first, last, index0 их всего 4, свойств loop -->
+<!-- луп-индекс просто даёт счётчик итераций с 1 (index0 с нуля)-->
+<!-- ↑ если это первая или последняя итерация, bool -->
+<!--внутрь шаблона не надо комментарии вставлять-->
+
+<!--блочный элемент ↑ займёт чётко целую строку-->
+
+
+
+</body>
+</html>

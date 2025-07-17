@@ -7,20 +7,45 @@ import os
 # модель это хранимые данные, представление это что отображаем,
 # а контроллер это тот, кто принимает запросы и отвечает
 #
-from flask import Flask, url_for, request
+# шаблонизатор JINJA
+#
+from flask import Flask, url_for, request, render_template
+from werkzeug.utils import secure_filename
 import sqlite3
+from forms.login_form import LoginForm
+from data import db_session
 
 # внутри Фласка есть сервер, на локальном хосте он кудахчет
 # до тех пор, пока не остановишь
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'uploads'
+debug = False
+app.config['UPLOAD_FOLDER'] = 'uploads/'
+app.config['SECRET_KEY'] = ('В пуранической истории пахтанья Молочного океана, дэвы и асуры'
+                            'вели народ в пуране, и в пуране вели народ в пуране...'
+                            'использовали Мандару как мутовку, а зме́я Васуки — как верёвку.')
+ALLOWED_EXTENSIONS = {'txt', 'csv', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar', '7z'}
+
+
+def allowed_file(filename: str) -> bool:
+    return ('.' in filename
+            and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS)
+    # два способа переноса в Питоне: через '\' или всё выражение в скобках (с 3.9)
+
+
+# def secure_filename(filename: str) -> str:
+#     return filename
+#     # сделать перевод в допустимые символы
 
 # для коммуникации с браузером юзаем декоратор @app.route
 @app.route('/')
 @app.route('/index')
 def index():
-    return 'Привет, чуваки!'
+    params = {}
+    params['title'] = 'Приветствие'
+    params['user'] = 'Юзер'
+    params['weather'] = 'погодка ништяк'
+    return render_template('index.html', **params)
 
 
 # колбэк-функция, возвращает браузеру ответ
@@ -29,7 +54,7 @@ def index():
 @app.route('/about')
 def about():  # имена функций уникальны
     print('Вызвана страница о нас')
-    return 'История о нас'
+    return render_template('about.html', title='О нас', user='посетитель')
 
 
 @app.route('/countdown')
@@ -74,6 +99,7 @@ def sample_page2():
     with open('temp2.html', 'r', encoding='utf-8') as h:
         return h.read()
 
+
 # @app.route('/form')
 # def form():
 #     with open('static/html/form.html', 'r', encoding='utf-8') as h:
@@ -98,15 +124,31 @@ def greeting(user, user_id):
     return f'Привет, {user} с токеном {user_id}!<br>'
 
 
-
-
-def get_person(trip_id):
+def _get_person(trip_id):
     connection = sqlite3.connect('db/persons.sqlite')
     cursor = connection.cursor()
     res = cursor.execute(f'SELECT name FROM users WHERE trip_id = {trip_id}').fetchone()
     cursor.close()
     connection.close()
     return res
+
+
+@app.route('/trip/')  # но так лучше например вывести все имена
+@app.route('/trip/<int:trip_id>')
+def return_person(trip_id=None):
+    if trip_id is None:
+        return 'Не указан идентификатор поездки', '404 NOT FOUND'
+    else:
+        print(trip_id)
+    return _get_person(trip_id)[0], '200 OK'
+
+
+"""
+ДЗ возвращать список всех имён если не указан id
+return <a href="localhost:5000/get-user/{id-name}">ФИО</a>
+    "нет номера записи" и список всех путёвок 
+"""
+
 
 # name, city = result[0] - тка можно, распаковываем
 # тогда return f"""<table>
@@ -121,15 +163,6 @@ def get_person(trip_id):
 #       </table>"""
 # ДЗ проверю
 
-@app.route('/trip/')    # но так лучше например вывести все имена
-@app.route('/trip/<int:trip_id>')
-def return_person(trip_id=None):
-    if trip_id is None:
-        return 'Не указан идентификатор поездки', '404 NOT FOUND'
-    else:
-        print(trip_id)
-    return get_person(trip_id)[0], '200 OK'
-
 
 # GET запрашивает данные, не меняя состояние сервера (read)
 # POST отправляет данные на сервер (submit)
@@ -140,7 +173,7 @@ def return_person(trip_id=None):
 @app.route('/form', methods=['GET', 'POST'])
 def form_test():
     if request.method == 'GET':
-        with open('static/html/form.html', 'r', encoding='utf-8') as h:
+        with open('templates/form.html', 'r', encoding='utf-8') as h:
             return h.read()
     elif request.method == 'POST':
         result = request.form
@@ -156,6 +189,60 @@ def form_test():
     return 'Такая тема не воспринимается сервером', '405 METHOD NOT ALLOWED'
 
 
+@app.route('/upload', methods=['GET', 'POST'])
+def file_upload():
+    if request.method == 'GET':
+        with open('templates/uploading.html', 'r', encoding='utf-8') as h:
+            return h.read()
+    elif request.method == 'POST':
+        if 'file' not in request.files:
+            return 'Файл не выбран', '400 BAD REQUEST'
+
+        filename = request.files['file'].filename
+        file = request.files['file']
+
+        if filename == '':
+            return 'Файл без имени', '400 BAD REQUEST'
+        if file and allowed_file(filename):
+            proper_name = secure_filename(filename)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], proper_name))
+            return f'Файл {filename} успешно загружен!<br>'
+    return 'Ошибка загрузки', '400 BAD REQUEST'
+
+
+@app.route('/numbers')
+@app.route('/numbers/<int:num>')
+def odd_even(num=None):  # лучше конечно пусть имя функции совпадает с оконечником
+    if num == None:
+        return render_template('numbers.html', title='Нет числа, укажите его через "/число"',
+                               number=''), '204 NO CONTENT'
+    return render_template('numbers.html', title='Чёт/нечёт', number=num)
+
+
+@app.route('/todo')
+def todo():
+    deals = ['Передать показания счётчика', 'Выгулять слона', 'Сходить за раскладом']
+    return render_template('todo.html', deals=deals)
+
+
+@app.route('/queue')
+def queue():
+    return render_template('vars.html', title='Очередь')
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    l_form = LoginForm()
+    if l_form.validate_on_submit():
+        # если валидация прошла, значит то метод POST
+        return f'Форма залита', '200 OK'
+    else:
+        return render_template('login.html', title='Вход', form=l_form), '200 OK'
+
+
+# result = request.form
+
+
 #     "контекст запроса" так называется тело ответа
 # ДЗ <input type="reset"> и сабмит, а ещё посмотреть, что пишет какой браузер на кнопке по умолчанию
 # ДЗ как закинуть файл на сервер (через форму)
@@ -164,5 +251,12 @@ def form_test():
 # для запуска сервера импортируем app, вызываем run,
 # эта строка должна быть в конце!
 if __name__ == '__main__':
-    app.run(host='localhost', port=5000, debug=False)  # условно принят (в Докере 3000, ещё 8000 иногда)
+    db_session.global_init('db/news.sqlite')
+    app.run(host='localhost', port=5000, debug=debug)  # условно принят (в Докере 3000, ещё 8000 иногда)
 # приказы идут сверху вниз, подписи идут снизу вверх
+
+"""
+Наследование шаблонов.
+Надо сделать базовый для начала.
+
+"""
