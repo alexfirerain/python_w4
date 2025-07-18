@@ -1,5 +1,6 @@
 # Введение въ Flask
 import os
+from datetime import datetime
 
 # MVC - Model View Controller - Модель Представление Контроллер
 # Фласк и есть такой фреймворк, минимально реализующий MVC
@@ -9,11 +10,15 @@ import os
 #
 # шаблонизатор JINJA
 #
-from flask import Flask, url_for, request, render_template
+from flask import Flask, url_for, request, render_template, redirect
 from werkzeug.utils import secure_filename
 import sqlite3
 from forms.login_form import LoginForm
+from forms.user import Register
 from data import db_session
+from data.users import User
+from data.news import News
+from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 
 # внутри Фласка есть сервер, на локальном хосте он кудахчет
 # до тех пор, пока не остановишь
@@ -25,6 +30,9 @@ app.config['SECRET_KEY'] = ('В пуранической истории пахт
                             'вели народ в пуране, и в пуране вели народ в пуране...'
                             'использовали Мандару как мутовку, а зме́я Васуки — как верёвку.')
 ALLOWED_EXTENSIONS = {'txt', 'csv', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar', '7z'}
+
+login_manager = LoginManager()
+login_manager.init_app(app)
 
 
 def allowed_file(filename: str) -> bool:
@@ -213,7 +221,7 @@ def file_upload():
 @app.route('/numbers')
 @app.route('/numbers/<int:num>')
 def odd_even(num=None):  # лучше конечно пусть имя функции совпадает с оконечником
-    if num == None:
+    if num is None:
         return render_template('numbers.html', title='Нет числа, укажите его через "/число"',
                                number=''), '204 NO CONTENT'
     return render_template('numbers.html', title='Чёт/нечёт', number=num)
@@ -235,9 +243,70 @@ def login():
     l_form = LoginForm()
     if l_form.validate_on_submit():
         # если валидация прошла, значит то метод POST
-        return f'Форма залита', '200 OK'
+        db_sess = db_session.create_session()
+        user = (db_sess.query(User)
+                .filter(User.email == l_form.email.data).first())   # если нет, возвращает None
+        if user and user.check_password(l_form.password.data):
+            login_user(user, remember=l_form.remember_me.data)
+            return redirect('/')
+        else:
+            return render_template('login.html',
+                                   title='Вход',
+                                   message='Неправильный логин или пароль',
+                                   form=l_form), '401 UNAUTHORIZED'
     else:
         return render_template('login.html', title='Вход', form=l_form), '200 OK'
+
+@login_manager.user_loader
+def load_user(user_id):
+    db_sess = db_session.create_session()
+    return db_sess.query(User).get(user_id)
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect('/')
+
+
+@app.route("/404")
+def not_found(e):
+    return render_template('404.html', title="Страница не найдена"), '404 NOT FOUND'
+
+@app.route("/news")
+def news():
+    db_sess = db_session.create_session()
+    all_public_news = db_sess.query(News).filter(News.is_private == False).all()
+    return render_template('news.html', title='Новости', news=all_public_news), '200 OK'
+
+@app.route("/register", methods=['GET', 'POST'])
+def register():
+    reg_form = Register()
+    if reg_form.validate_on_submit():   # эквивалентно, что request.method == 'POST'
+    #  если пароли не совпали
+        if reg_form.password.data != reg_form.password_repeat.data:
+            return render_template('register.html',
+                                   title='Давайте нормально региться',
+                                   message="пароли не совпадают",
+                                   form=reg_form), '406 NOT ACCEPTABLE'
+        db_sess = db_session.create_session()
+            # Если юзер с таким email уже есть
+        if db_sess.query(User).filter(User.email == reg_form.email.data).first():
+            return render_template('register.html',
+                               title='Давайте нормально региться',
+                               message="такой пользователь уже зареген",
+                               form=reg_form), '406 NOT ACCEPTABLE'
+        user = User(
+            name=reg_form.name.data,
+            email=reg_form.email.data,
+            about=reg_form.about.data,
+        )
+        user.set_password(reg_form.password.data)
+        db_sess.add(user)
+        db_sess.commit()
+# теперь безусловный редирект
+        return redirect('/login')
+    return render_template('register.html', title='Регистрация', form=reg_form), '200 OK'
 
 
 # result = request.form
@@ -251,12 +320,76 @@ def login():
 # для запуска сервера импортируем app, вызываем run,
 # эта строка должна быть в конце!
 if __name__ == '__main__':
-    db_session.global_init('db/news.sqlite')
+    db_session.global_init('db/news.sqlite')  # это подключает ORM
     app.run(host='localhost', port=5000, debug=debug)  # условно принят (в Докере 3000, ещё 8000 иногда)
-# приказы идут сверху вниз, подписи идут снизу вверх
+    # приказы идут сверху вниз, подписи идут снизу вверх
+
+    # db_sess = db_session.create_session()
+    # first = db_sess.query(User).first()
+    # print(first)
+    # print(db_sess.query(User).all())
+    # print(db_sess.query(User).filter(User.id > 1).first())
+    #
+    # # любые условия-предикаты в фильтр, причём можно через запятую вместо AND
+    # db_sess.query(User).filter((User.id == 1), User.email.not_like("%a%")).all()
+    # db_sess.query(User).filter((User.id != 1) | (User.email.not_like("%a%"))).all()
+    #
+    # # db_sess.query(User).filter(User.id == 2).first().name = 'Хуюзырь Батькыч'
+    # # db_sess.commit()    # и все изменения, навороченные нами, улетели в БД!!!
+    #
+    # # db_sess.query(User).filter(User.id == 2).first().delete()  # удаление по id
+    # # db_sess.commit()
+    #
+    # # user = db_sess.query(User).filter(User.id == 2).first()
+    # # db_sess.delete(user)
+    # db_sess.commit()
+    #
+    # # а вместо OR тогда у нас `|`
+    #
+    # # user = User()  # вот и стал доступным этот класс, ща по-простеньки
+    # # user.name = 'Хуюзырь'
+    # # user.about = 'данные о Хуюзыре'
+    # # user.email = 'whoyuzy@yandex.ru'
+    # # db_sess = db_session.create_session()  # открываем сессию работать с БД
+    # # db_sess.add(user)
+    # # db_sess.commit()  # сохраняем изменения в БД
+    #
+    # news = News(title='Ещё одна новость', content = 'Макарон объелся хохлопиздама', is_private=False, user_id=1)
+    # # db_sess.add(news)
+    # # db_sess.commit()
+    #
+    # user = db_sess.query(User).filter(User.id == 1).first()
+    # user.news.append(news)  # добавляем новость в список новостей юзера!!!
+    # db_sess.commit()
+
+#     говорят, если в Юзере сделать репр возвращающим номер, то можно будет передать uesr_id=user
+#  чтобы удалить юзера, сначала надо удалить все его связанные новости
+
+
+    # print(db_sess.query(News).filter(News.id == 2).first().content)
+
+    # for news in user.news:
+    #     print(f'{news.title}: {news.content}')
 
 """
 Наследование шаблонов.
 Надо сделать базовый для начала.
 
+"""
+
+"""
+Юзера надо порадовать, когда 404 у него.
+У сайта должен быть значок-пиктограмма: `.png` на прозрачном фоне, квадратная, размеры кратны 16
+
+Яндекс ещё предлагает сделать svg 128x128 в кабинете вэбмастера, типа он на все будет рендериться.
+
+А ещё метод дескрипшын.
+
+DBeaver мощнейший, оверкильный.
+"""
+
+"""
+# Как теперь ловить, кто зареген, кто не зареген?
+is_authenticated()
+сделать, чтоб когда залогинен, то вместо кнопки вход, кнопка выход
 """

@@ -3,7 +3,7 @@ from wtforms import StringField, PasswordField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, Length, Email, EqualTo
 
 class LoginForm(FlaskForm):
-    username = StringField('Кличка', validators=[DataRequired("обязательное поле"), Length(min=4, max=20, message="от 4 до 20 символов")])
+    email = StringField('Кличка (почта)', validators=[DataRequired("обязательное поле"), Length(min=4, max=20, message="от 4 до 20 символов")])
     password = PasswordField('Словечко', validators=[DataRequired("обязательное поле")])
     remember_me = BooleanField('Помнить меня')
     submit = SubmitField('Зайти')
