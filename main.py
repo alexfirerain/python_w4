@@ -2,6 +2,7 @@
 import os
 from datetime import datetime
 
+import requests
 # MVC - Model View Controller - Модель Представление Контроллер
 # Фласк и есть такой фреймворк, минимально реализующий MVC
 # ещё Джанго, там много всего.
@@ -10,15 +11,16 @@ from datetime import datetime
 #
 # шаблонизатор JINJA
 #
-from flask import Flask, url_for, request, render_template, redirect
+from flask import Flask, url_for, request, render_template, redirect, abort
 from werkzeug.utils import secure_filename
 import sqlite3
 from forms.login_form import LoginForm
+from forms.news import NewsForm
 from forms.user import Register
-from data import db_session
+from data import db_session, news_api
 from data.users import User
 from data.news import News
-from flask_login import LoginManager, login_user, login_required, logout_user, current_user
+from flask_login import LoginManager, login_user, login_required, logout_user, current_user, login_required
 
 # внутри Фласка есть сервер, на локальном хосте он кудахчет
 # до тех пор, пока не остановишь
@@ -49,10 +51,10 @@ def allowed_file(filename: str) -> bool:
 @app.route('/')
 @app.route('/index')
 def index():
-    params = {}
-    params['title'] = 'Приветствие'
-    params['user'] = 'Юзер'
-    params['weather'] = 'погодка ништяк'
+    # visitor = current_user.name if current_user.is_authenticated else 'Юзер'
+    params = {'title': 'Приветствие',
+              'user': current_user.name if current_user.is_authenticated else 'Юзер',
+              'weather': 'погодка ништяк'}
     return render_template('index.html', **params)
 
 
@@ -62,64 +64,24 @@ def index():
 @app.route('/about')
 def about():  # имена функций уникальны
     print('Вызвана страница о нас')
+    # if current_user.is_authenticated and current_user.is_admin():
+
     return render_template('about.html', title='О нас', user='посетитель')
-
-
-@app.route('/countdown')
-def countdown():
-    # в колбэке yield не работает
-    lst = [str(x) for x in range(10, 0, -1)]
-    lst.append('Поехали!')
-    return '<br>'.join(lst)  # сервер (от колбэка) принимает только строку (не число)
 
 
 # хороший тон это на 404 коде возвращать человеческое извинение
 # статический контент — его просто так не добавишь, полагается ложить в папку static
 
 
-@app.route('/image')
-def show_image():
-    # return f'<img src="static/img/map.jpg">'  # кросбраузерность и адаптивность это проблемы современной разработки (и поддержка старых браузеров)
-    return f'<img src="{url_for('static', filename='img/map.jpg')}">'
+@app.errorhandler(401)
+def unauthorized(error):
+    return redirect("/login"), 401  # либо дать страницу с описанием ситуаци
 
 
 # для изображений, скриптов, мультимедиа, шрифтов, CSS и прочего надо свою папку static
 # ДЗ что такое резет или нормалайз ЦСС, сначала поэтому резет, потом свои.
 # чтоб постоянно не менять пути, есть url_for
 
-@app.route('/sample-page')
-def sample_page():
-    return f"""<!DOCTYPE html>
-            <html lang="ru">
-            <head>
-                <meta charset="UTF-8">
-                <title>Карта</title>
-            </head>
-            <body>
-                <img src="{url_for('static', filename='img/map.jpg')}" alt="Python">
-            </body>
-            </html>
-    """
-
-
-@app.route('/sample-page2')
-def sample_page2():
-    with open('temp2.html', 'r', encoding='utf-8') as h:
-        return h.read()
-
-
-# @app.route('/form')
-# def form():
-#     with open('static/html/form.html', 'r', encoding='utf-8') as h:
-#         return h.read()
-
-
-# x = 5
-# @app.route('/1')   # так не делаем конечно
-# def show_num():
-#     global x
-#     x += 1
-#     return str(x)
 
 # <string> по умолчанию строка
 # <int:number> - так передаём число
@@ -157,19 +119,6 @@ return <a href="localhost:5000/get-user/{id-name}">ФИО</a>
     "нет номера записи" и список всех путёвок 
 """
 
-
-# name, city = result[0] - тка можно, распаковываем
-# тогда return f"""<table>
-#       <tr>
-#           <td>ФИО</td>
-#           <td>Город</td>
-#       </tr>
-#       <tr>
-#           <td> {name}</td>
-#           <td> {city}</td>
-#       </tr>
-#       </table>"""
-# ДЗ проверю
 
 
 # GET запрашивает данные, не меняя состояние сервера (read)
@@ -245,7 +194,7 @@ def login():
         # если валидация прошла, значит то метод POST
         db_sess = db_session.create_session()
         user = (db_sess.query(User)
-                .filter(User.email == l_form.email.data).first())   # если нет, возвращает None
+                .filter(User.email == l_form.email.data).first())  # если нет, возвращает None
         if user and user.check_password(l_form.password.data):
             login_user(user, remember=l_form.remember_me.data)
             return redirect('/')
@@ -257,13 +206,16 @@ def login():
     else:
         return render_template('login.html', title='Вход', form=l_form), '200 OK'
 
+
 @login_manager.user_loader
 def load_user(user_id):
     db_sess = db_session.create_session()
     return db_sess.query(User).get(user_id)
 
+
 @app.route('/logout')
-@login_required
+@login_required  # значит лишь авторизованные пользователи могут попасть на эту страницу
+# чтоб юзер не увидел ошибку, сразу делаем редирект безусловный
 def logout():
     logout_user()
     return redirect('/')
@@ -273,29 +225,37 @@ def logout():
 def not_found(e):
     return render_template('404.html', title="Страница не найдена"), '404 NOT FOUND'
 
+
 @app.route("/news")
 def news():
     db_sess = db_session.create_session()
-    all_public_news = db_sess.query(News).filter(News.is_private == False).all()
+    if current_user.is_authenticated:
+        all_public_news = db_sess.query(News).filter(
+            (News.user == current_user) | (News.is_private != True)).all()  # ?
+    else:
+        all_public_news = db_sess.query(News).filter(
+            (News.is_private != True)).all()
+    # all_public_news = db_sess.query(News).filter(News.is_private == False).all()
     return render_template('news.html', title='Новости', news=all_public_news), '200 OK'
+
 
 @app.route("/register", methods=['GET', 'POST'])
 def register():
     reg_form = Register()
-    if reg_form.validate_on_submit():   # эквивалентно, что request.method == 'POST'
-    #  если пароли не совпали
+    if reg_form.validate_on_submit():  # эквивалентно, что request.method == 'POST'
+        #  если пароли не совпали
         if reg_form.password.data != reg_form.password_repeat.data:
             return render_template('register.html',
                                    title='Давайте нормально региться',
                                    message="пароли не совпадают",
                                    form=reg_form), '406 NOT ACCEPTABLE'
         db_sess = db_session.create_session()
-            # Если юзер с таким email уже есть
+        # Если юзер с таким email уже есть
         if db_sess.query(User).filter(User.email == reg_form.email.data).first():
             return render_template('register.html',
-                               title='Давайте нормально региться',
-                               message="такой пользователь уже зареген",
-                               form=reg_form), '406 NOT ACCEPTABLE'
+                                   title='Давайте нормально региться',
+                                   message="такой пользователь уже зареген",
+                                   form=reg_form), '406 NOT ACCEPTABLE'
         user = User(
             name=reg_form.name.data,
             email=reg_form.email.data,
@@ -304,9 +264,85 @@ def register():
         user.set_password(reg_form.password.data)
         db_sess.add(user)
         db_sess.commit()
-# теперь безусловный редирект
+        # теперь безусловный редирект
         return redirect('/login')
     return render_template('register.html', title='Регистрация', form=reg_form), '200 OK'
+
+
+@app.route('/newsmaking', methods=['GET', 'POST'])
+@login_required
+def make_news():
+    news_form = NewsForm()
+    if news_form.validate_on_submit():
+        db_sess = db_session.create_session()
+        piece_of_news = News()
+        piece_of_news.title = news_form.title.data
+        piece_of_news.content = news_form.content.data
+        piece_of_news.is_private = news_form.is_private.data
+        current_user.news.append(piece_of_news)
+        db_sess.merge(current_user)
+        db_sess.commit()
+        return redirect('/news')
+    return render_template('newsmaking.html', 'Добавление новости', form=news_form), '200 OK'
+
+
+@app.route('/news/<int:id>', methods=['GET', 'POST'])
+@login_required
+def edit_news(id_num):
+    ed_form = NewsForm()
+    if request.method == 'GET':
+        db_sess = db_session.create_session()
+        piece_of_news = db_sess.query(News).filter(
+            News.id == id_num, News.user == current_user).first()
+        if piece_of_news:
+            ed_form.title.data = piece_of_news.title
+            ed_form.content.data = piece_of_news.content
+            ed_form.is_private.data = piece_of_news.is_private
+        else:
+            abort(404)
+    if ed_form.validate_on_submit():
+        db_sess = db_session.create_session()
+        piece_of_news = db_sess.query(News).filter(
+            News.id == id_num, News.user == current_user).first()
+        if piece_of_news:
+            piece_of_news.title = ed_form.title.data
+            piece_of_news.content = ed_form.content.data
+            piece_of_news.is_private = ed_form.is_private.data
+            db_sess.commit()
+            return redirect('/news')
+        else:
+            abort(404)
+    return render_template('newsmaking.html', title='Работаем с новостью', form=ed_form), '200 OK'
+
+
+@app.route('/newsdel/<int:id>')  # можно и метод DELETE
+@login_required
+def delete_news(id_num):
+    db_sess = db_session.create_session()
+    news = db_sess.query(News).filter(News.id == id_num, News.user == current_user).first()
+    if news:
+        # здесь ещё можно спросить, уверен ли он
+        db_sess.delete(news)
+        db_sess.commit()
+    else:
+        abort(404)
+    return redirect('/news')
+
+@app.route('/admin_page')
+@login_required
+def admin_page():
+    if current_user.is_authenticated and current_user.is_admin():
+        db_sess = db_session.create_session()
+        all_news = db_sess.query(News).all()
+        return render_template('admin_page.html', title='Админка', news=all_news), '200 OK'
+    else:
+        abort(404)
+
+
+@app.route('/test-api')
+def test_api():
+    # ДЗ - вернуть это ещё встроенным в шаблон
+    return requests.get('http://localhost:5000/api/news').json(), '200 OK'
 
 
 # result = request.form
@@ -321,6 +357,7 @@ def register():
 # эта строка должна быть в конце!
 if __name__ == '__main__':
     db_session.global_init('db/news.sqlite')  # это подключает ORM
+    app.register_blueprint(news_api.blueprint)
     app.run(host='localhost', port=5000, debug=debug)  # условно принят (в Докере 3000, ещё 8000 иногда)
     # приказы идут сверху вниз, подписи идут снизу вверх
 
@@ -366,10 +403,10 @@ if __name__ == '__main__':
 #  чтобы удалить юзера, сначала надо удалить все его связанные новости
 
 
-    # print(db_sess.query(News).filter(News.id == 2).first().content)
+# print(db_sess.query(News).filter(News.id == 2).first().content)
 
-    # for news in user.news:
-    #     print(f'{news.title}: {news.content}')
+# for news in user.news:
+#     print(f'{news.title}: {news.content}')
 
 """
 Наследование шаблонов.
@@ -392,4 +429,25 @@ DBeaver мощнейший, оверкильный.
 # Как теперь ловить, кто зареген, кто не зареген?
 is_authenticated()
 сделать, чтоб когда залогинен, то вместо кнопки вход, кнопка выход
+"""
+
+"""
+"Вэб приложение на Фласк-Питон" — это наш ключ к описанию нашего диплома.
+Ничего "особо хорошего" делать не надо, это сделаем потом.
+Сейчас надо сделать простой сайтец с базой данных.
+Транслировать можно через "тоннель" съ своего компа, можно выйти к доске, или с места, или вообще.
+Скачать методички с диска можно до 27 июля, сегодня там полный комплект материалов. 
+см. также https://github.com/ipapMaster/flaskLessons
+можно залить на 15 минут: https://github.com/ipapMaster/renderTest
+ещё на Пайтон-энивэа можно разместить.
+
+
+Как добавить фрагмент карты.
+
+Есть Service Oriented Architecture (SOA), есть Microservices Architecture (MSA) как его реализация.
+Архитектура "рассовываем по микросервисам":
+Representational State Transfer (REST)
+"мы с белков не работаем", надо сначала отрэмить.
+у нас красные, а у них "синька".
+
 """

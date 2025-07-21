@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Сообщения пользователей</h1>
+
+<table>
+    <tr>
+        <th>№</th>
+        <th>Заголовок</th>
+        <th>Автор</th>
+        <th>Содержание</th>
+    </tr>
+    {% for piece_of_news in news %}
+    <tr>
+        <td>loop.index</td>
+        <td>{{ piece_of_news.title }}</td>
+        <td><i>{{ piece_of_news.user_id.name }}</i></td>
+        <td>{{ piece_of_news.content }}
+        </td>
+        </tr>
+    {% endfor %}
+
+
+
+</table>
+
+
+
+{% endblock %}

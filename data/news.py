@@ -1,9 +1,10 @@
 import datetime
 import sqlalchemy as sa
 from .db_session import SqlAlchemyBase
+from sqlalchemy_serializer import SerializerMixin
 from sqlalchemy import orm
 
-class News(SqlAlchemyBase):
+class News(SqlAlchemyBase, SerializerMixin):
     # если не указать __tablename__, то название таблицы будет равно имени класса
     __tablename__ = 'news'
 
