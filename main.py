@@ -11,7 +11,7 @@ import requests
 #
 # шаблонизатор JINJA
 #
-from flask import Flask, url_for, request, render_template, redirect, abort
+from flask import Flask, url_for, request, render_template, redirect, abort, make_response, jsonify
 from werkzeug.utils import secure_filename
 import sqlite3
 from forms.login_form import LoginForm
@@ -21,6 +21,8 @@ from data import db_session, news_api
 from data.users import User
 from data.news import News
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user, login_required
+from mailsender import send_mail
+
 
 # внутри Фласка есть сервер, на локальном хосте он кудахчет
 # до тех пор, пока не остановишь
@@ -76,6 +78,16 @@ def about():  # имена функций уникальны
 @app.errorhandler(401)
 def unauthorized(error):
     return redirect("/login"), 401  # либо дать страницу с описанием ситуаци
+
+
+
+@app.errorhandler(400)
+def bad_request(_):
+    return make_response(jsonify({'error': 'Bad request'}), 400)
+
+@app.errorhandler(404)
+def not_found(_):
+    return make_response(jsonify({'error': 'Not found'}), 404)
 
 
 # для изображений, скриптов, мультимедиа, шрифтов, CSS и прочего надо свою папку static
@@ -342,7 +354,22 @@ def admin_page():
 @app.route('/test-api')
 def test_api():
     # ДЗ - вернуть это ещё встроенным в шаблон
-    return requests.get('http://localhost:5000/api/news').json(), '200 OK'
+    json_news = requests.get('http://localhost:5000/api/news').json()
+    return render_template("testapi.html", title="тест АПИ", news=json_news), '200 OK'
+# чтобы узнать возвращаемые АПИ имена полей, можно и нужно сначала посмотреть запрос
+# ещё можно было сразу возвращать не `json_news`, а `josn_news['news']`
+
+
+@app.route('/sendmail', methods=['GET', 'POST'])
+def mail():
+    name = request.form.get('name')
+    email = request.form.get('email')
+    message = request.form.get('message')
+    mess = f'письмо с обратной связью от {name} c {email} отправлено:\n{message}'
+    send_mail("alexfirerain@yandex.ru", "письмо с сайта", mess)
+    send_mail(email, 'Получено', f'Уважаемый {name}, спасибо за обратную связь!')
+    return render_template('about.html', title='Отправка почты',
+        mess=mess), '200 OK'
 
 
 # result = request.form
@@ -358,7 +385,7 @@ def test_api():
 if __name__ == '__main__':
     db_session.global_init('db/news.sqlite')  # это подключает ORM
     app.register_blueprint(news_api.blueprint)
-    app.run(host='localhost', port=5000, debug=debug)  # условно принят (в Докере 3000, ещё 8000 иногда)
+    app.run(host='localhost', port=5050, debug=debug)  # условно принят (в Докере 3000, ещё 8000 иногда)
     # приказы идут сверху вниз, подписи идут снизу вверх
 
     # db_sess = db_session.create_session()

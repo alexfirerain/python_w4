@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Список новостей</h1>
+    {% set a = news['news'] %}
+    {% for items in a %}
+        <h2>{{item['title']}}</h2>
+        <p>{{item['content']}}</p>
+        <p><b>Автор</b>: {{item['user']}}</p>
+
+
+    {% endfor %}
+
+
+{% endblock %}
