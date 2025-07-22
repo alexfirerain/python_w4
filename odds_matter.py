@@ -18,6 +18,9 @@ Live Sass Compiler
 ещё есть
 LESS
 
+xTunnel.ru - это сайт, надо посмотреть
+ДЗ создать своего бота через фазера, токен надо будет завтра
+
 """
 from mailsender import send_mail
 
