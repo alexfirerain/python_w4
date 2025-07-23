@@ -382,6 +382,12 @@ def mail():
 #
 #
 
+def send_to_telebot(message):
+    bot_token = '7623744358:AAGDl6HJVlo7L9q58kqu7woFaRJ8f-XnTiw'
+    chat_id = '5254248743'
+    requests.get(f'https://api.telegram.org/bot{bot_token}/sendMessage?chat_id={chat_id}&text={message}')
+
+
 
 
 
