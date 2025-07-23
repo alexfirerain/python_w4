@@ -17,7 +17,8 @@ import sqlite3
 from forms.login_form import LoginForm
 from forms.news import NewsForm
 from forms.user import Register
-from data import db_session, news_api
+from data import db_session, news_api, api_resources
+from flask_restful import Api
 from data.users import User
 from data.news import News
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user, login_required
@@ -28,6 +29,7 @@ from mailsender import send_mail
 # до тех пор, пока не остановишь
 
 app = Flask(__name__)
+api = Api(app)
 debug = False
 app.config['UPLOAD_FOLDER'] = 'uploads/'
 app.config['SECRET_KEY'] = ('В пуранической истории пахтанья Молочного океана, дэвы и асуры'
@@ -372,12 +374,26 @@ def mail():
         mess=mess), '200 OK'
 
 
+# @app.route('/news', methods=['PUT'])
+# def news_edit():
+#
+#     try:
+#         if 'titile' in request.json:
+#
+#
+
+
+
+
 # result = request.form
 
 
 #     "контекст запроса" так называется тело ответа
 # ДЗ <input type="reset"> и сабмит, а ещё посмотреть, что пишет какой браузер на кнопке по умолчанию
-# ДЗ как закинуть файл на сервер (через форму)
+
+
+
+
 
 
 # для запуска сервера импортируем app, вызываем run,
@@ -385,8 +401,17 @@ def mail():
 if __name__ == '__main__':
     db_session.global_init('db/news.sqlite')  # это подключает ORM
     app.register_blueprint(news_api.blueprint)
+    # доступ к отдельной новости
+    api.add_resource(api_resources.NewsResource, '/api/v2/news/<int:news_id>')
+    # доступ къ всем новостям
+    api.add_resource(api_resources.NewsResourceList, '/api/v2/news')
     app.run(host='localhost', port=5050, debug=debug)  # условно принят (в Докере 3000, ещё 8000 иногда)
     # приказы идут сверху вниз, подписи идут снизу вверх
+
+
+
+
+
 
     # db_sess = db_session.create_session()
     # first = db_sess.query(User).first()
